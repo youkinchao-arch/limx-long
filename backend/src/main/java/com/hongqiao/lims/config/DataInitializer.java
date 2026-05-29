@@ -39,7 +39,8 @@ public class DataInitializer implements ApplicationRunner {
 
     /** Workflow permissions beyond the standard read/write grants. */
     private static final List<String> EXTRA_PERMISSIONS =
-            List.of("document:approve", "report:approve", "report:sign");
+            List.of("document:approve", "report:approve", "report:sign",
+                    "equipment:calibrate", "equipment:maintain");
 
     private static String allPermissions() {
         String base = MODULES.stream()

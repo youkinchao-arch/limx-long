@@ -466,4 +466,102 @@ class LimsApiTests {
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_PDF));
     }
+
+    // ---- P2: equipment calibration + maintenance workflow ----
+
+    private long createEquipment(String assetNo) throws Exception {
+        MvcResult created = mockMvc
+                .perform(post("/api/v1/equipment")
+                        .header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"asset_no\":\"" + assetNo + "\",\"name\":\"Balance\",\"status\":\"in_use\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+    }
+
+    @Test
+    void calibrationRecordUpdatesEquipmentAndSignature() throws Exception {
+        String token = bearer();
+        long id = createEquipment("EQ-CAL-1");
+
+        mockMvc.perform(post("/api/v1/equipment/" + id + "/records")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"record_type\":\"calibration\",\"result\":\"pass\","
+                                + "\"performed_date\":\"2030-01-01\",\"cycle_days\":365,"
+                                + "\"certificate_no\":\"CERT-1\",\"password\":\"admin123\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.record_type", is("calibration")))
+                .andExpect(jsonPath("$.performed_by_name", is("admin")))
+                .andExpect(jsonPath("$.next_due_date", is("2031-01-01")))
+                .andExpect(jsonPath("$.signature_hash", notNullValue()));
+
+        mockMvc.perform(get("/api/v1/equipment/" + id).header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.calibration_date", is("2030-01-01")))
+                .andExpect(jsonPath("$.calibration_due", is("2031-01-01")))
+                .andExpect(jsonPath("$.calibration_status", is("valid")));
+
+        mockMvc.perform(get("/api/v1/equipment/" + id + "/records").header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)))
+                .andExpect(jsonPath("$[0].record_type", is("calibration")));
+    }
+
+    @Test
+    void maintenanceRecordUpdatesEquipment() throws Exception {
+        String token = bearer();
+        long id = createEquipment("EQ-MNT-1");
+
+        mockMvc.perform(post("/api/v1/equipment/" + id + "/records")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"record_type\":\"maintenance\",\"result\":\"completed\","
+                                + "\"performed_date\":\"2030-02-01\",\"cycle_days\":180,"
+                                + "\"password\":\"admin123\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.record_type", is("maintenance")))
+                .andExpect(jsonPath("$.next_due_date", is("2030-07-31")));
+
+        mockMvc.perform(get("/api/v1/equipment/" + id).header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.maintenance_date", is("2030-02-01")))
+                .andExpect(jsonPath("$.maintenance_status", notNullValue()));
+    }
+
+    @Test
+    void calibrationRecordRequiresCorrectPassword() throws Exception {
+        String token = bearer();
+        long id = createEquipment("EQ-CAL-2");
+        mockMvc.perform(post("/api/v1/equipment/" + id + "/records")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"record_type\":\"calibration\",\"password\":\"wrongpass\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", notNullValue()));
+    }
+
+    @Test
+    void calibrationRecordRejectsUnknownType() throws Exception {
+        String token = bearer();
+        long id = createEquipment("EQ-CAL-3");
+        mockMvc.perform(post("/api/v1/equipment/" + id + "/records")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"record_type\":\"bogus\",\"password\":\"admin123\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void calibrationRecordRequiresCalibratePermission() throws Exception {
+        long id = createEquipment("EQ-CAL-4");
+        createUser("eq_no_cal", "NoCalib123");
+        String restricted = "Bearer " + loginToken("eq_no_cal", "NoCalib123");
+        mockMvc.perform(post("/api/v1/equipment/" + id + "/records")
+                        .header("Authorization", restricted)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"record_type\":\"calibration\",\"password\":\"NoCalib123\"}"))
+                .andExpect(status().isForbidden());
+    }
 }
