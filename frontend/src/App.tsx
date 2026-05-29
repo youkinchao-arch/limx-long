@@ -7,8 +7,8 @@ import Dashboard from "./pages/Dashboard";
 import PersonnelPage from "./pages/PersonnelPage";
 import EquipmentPage from "./pages/EquipmentPage";
 import { MaterialsPage, SuppliersPage } from "./pages/WarehousePages";
+import DocumentsPage from "./pages/DocumentsPage";
 import {
-  DocumentsPage,
   EnvironmentPage,
   MethodsPage,
   ReportsPage,

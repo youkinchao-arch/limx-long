@@ -254,6 +254,88 @@ class LimsApiTests {
                 .andExpect(status().isUnauthorized());
     }
 
+    // ---- P2: controlled document approval workflow ----
+
+    private long createDocument(String docNo) throws Exception {
+        MvcResult created = mockMvc
+                .perform(post("/api/v1/documents")
+                        .header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"doc_no\":\"" + docNo + "\",\"title\":\"SOP\",\"status\":\"draft\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+    }
+
+    @Test
+    void documentApprovalWorkflowHappyPath() throws Exception {
+        String token = bearer();
+        long id = createDocument("DOC-WF-1");
+
+        mockMvc.perform(post("/api/v1/documents/" + id + "/submit")
+                        .header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("under_review")))
+                .andExpect(jsonPath("$.submitted_by_name", is("admin")));
+
+        mockMvc.perform(post("/api/v1/documents/" + id + "/approve")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"comment\":\"looks good\",\"effective_date\":\"2030-01-01\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("approved")))
+                .andExpect(jsonPath("$.approved_by_name", is("admin")))
+                .andExpect(jsonPath("$.effective_date", is("2030-01-01")));
+
+        mockMvc.perform(get("/api/v1/documents/" + id + "/reviews")
+                        .header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(2)))
+                .andExpect(jsonPath("$[0].action", is("APPROVE")))
+                .andExpect(jsonPath("$[1].action", is("SUBMIT")));
+    }
+
+    @Test
+    void documentApproveRejectedWhenNotUnderReview() throws Exception {
+        String token = bearer();
+        long id = createDocument("DOC-WF-2");
+
+        mockMvc.perform(post("/api/v1/documents/" + id + "/approve")
+                        .header("Authorization", token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", notNullValue()));
+    }
+
+    @Test
+    void documentApproveRequiresApprovePermission() throws Exception {
+        long id = createDocument("DOC-WF-3");
+        mockMvc.perform(post("/api/v1/documents/" + id + "/submit").header("Authorization", bearer()))
+                .andExpect(status().isOk());
+
+        createUser("doc_no_approve", "NoApprove123");
+        String restricted = "Bearer " + loginToken("doc_no_approve", "NoApprove123");
+        mockMvc.perform(post("/api/v1/documents/" + id + "/approve").header("Authorization", restricted))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void documentRejectReturnsToRejectedAndCanResubmit() throws Exception {
+        String token = bearer();
+        long id = createDocument("DOC-WF-4");
+
+        mockMvc.perform(post("/api/v1/documents/" + id + "/submit").header("Authorization", token))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/documents/" + id + "/reject")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"comment\":\"needs work\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("rejected")));
+        mockMvc.perform(post("/api/v1/documents/" + id + "/submit").header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("under_review")));
+    }
+
     @Test
     void accountLocksAfterTooManyFailedAttempts() throws Exception {
         createUser("lockout_user", "Lockout123");

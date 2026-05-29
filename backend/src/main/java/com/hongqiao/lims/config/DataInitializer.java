@@ -37,10 +37,14 @@ public class DataInitializer implements ApplicationRunner {
         this.props = props;
     }
 
+    /** Workflow permissions beyond the standard read/write grants. */
+    private static final List<String> EXTRA_PERMISSIONS = List.of("document:approve");
+
     private static String allPermissions() {
-        return MODULES.stream()
+        String base = MODULES.stream()
                 .flatMap(m -> List.of(m + ":read", m + ":write").stream())
                 .collect(Collectors.joining(","));
+        return base + "," + String.join(",", EXTRA_PERMISSIONS);
     }
 
     private static String readonlyPermissions() {
