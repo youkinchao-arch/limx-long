@@ -4,6 +4,7 @@ import com.hongqiao.lims.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
@@ -50,6 +51,41 @@ public class Equipment extends BaseEntity {
     @Column(name = "calibration_cycle_days")
     private Integer calibrationCycleDays;
 
+    @Column(name = "maintenance_date")
+    private LocalDate maintenanceDate;
+
+    @Column(name = "maintenance_due")
+    private LocalDate maintenanceDue;
+
+    @Column(name = "maintenance_cycle_days")
+    private Integer maintenanceCycleDays;
+
     @Column(columnDefinition = "text")
     private String remark;
+
+    /** Derived calibration freshness: overdue / due_soon / valid / unknown. */
+    @Transient
+    public String getCalibrationStatus() {
+        return dueStatus(calibrationDue);
+    }
+
+    /** Derived maintenance freshness: overdue / due_soon / valid / unknown. */
+    @Transient
+    public String getMaintenanceStatus() {
+        return dueStatus(maintenanceDue);
+    }
+
+    private static String dueStatus(LocalDate due) {
+        if (due == null) {
+            return "unknown";
+        }
+        LocalDate today = LocalDate.now();
+        if (due.isBefore(today)) {
+            return "overdue";
+        }
+        if (!due.isAfter(today.plusDays(30))) {
+            return "due_soon";
+        }
+        return "valid";
+    }
 }

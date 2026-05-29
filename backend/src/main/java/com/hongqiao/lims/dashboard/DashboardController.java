@@ -65,6 +65,9 @@ public class DashboardController {
         Specification<Equipment> calDue = (root, q, cb) -> cb.and(
                 cb.isNotNull(root.get("calibrationDue")),
                 cb.lessThanOrEqualTo(root.get("calibrationDue"), limit));
+        Specification<Equipment> maintDue = (root, q, cb) -> cb.and(
+                cb.isNotNull(root.get("maintenanceDue")),
+                cb.lessThanOrEqualTo(root.get("maintenanceDue"), limit));
         Specification<Material> matExpiring = (root, q, cb) -> cb.and(
                 cb.isNotNull(root.get("expiryDate")),
                 cb.lessThanOrEqualTo(root.get("expiryDate"), limit));
@@ -75,6 +78,7 @@ public class DashboardController {
         reminders.put("window_days", reminderDays);
         reminders.put("qualification_expiring", personnelRepository.count(qualExpiring));
         reminders.put("calibration_due", equipmentRepository.count(calDue));
+        reminders.put("maintenance_due", equipmentRepository.count(maintDue));
         reminders.put("material_expiring", materialRepository.count(matExpiring));
         reminders.put("environment_alarms", environmentRepository.count(envAlarm));
 
