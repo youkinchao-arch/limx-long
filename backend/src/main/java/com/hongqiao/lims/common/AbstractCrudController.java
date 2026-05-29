@@ -1,10 +1,12 @@
 package com.hongqiao.lims.common;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hongqiao.lims.audit.AuditService;
 import com.hongqiao.lims.security.PermissionChecker;
 import jakarta.persistence.criteria.Predicate;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -31,6 +33,12 @@ public abstract class AbstractCrudController<T> {
     protected final List<String> searchFields;
     protected final ObjectMapper objectMapper;
     protected final PermissionChecker perm;
+    protected AuditService auditService;
+
+    @Autowired
+    public void setAuditService(AuditService auditService) {
+        this.auditService = auditService;
+    }
 
     protected AbstractCrudController(
             CrudRepository<T> repository,
@@ -83,23 +91,30 @@ public abstract class AbstractCrudController<T> {
     public ResponseEntity<T> create(@RequestBody Map<String, Object> body) {
         requireWrite();
         T entity = objectMapper.convertValue(body, entityClass);
-        return ResponseEntity.status(HttpStatus.CREATED).body(repository.save(entity));
+        T saved = repository.save(entity);
+        auditService.recordChange("CREATE", entityClass.getSimpleName(), null, saved);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     @PutMapping("/{id}")
     public T update(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         requireWrite();
         T existing = repository.findById(id).orElseThrow(ApiException::notFound);
+        Object before = objectMapper.convertValue(existing, Map.class);
         T incoming = objectMapper.convertValue(body, entityClass);
         BeanCopyUtils.copyNonNull(incoming, existing);
-        return repository.save(existing);
+        T saved = repository.save(existing);
+        auditService.recordChange("UPDATE", entityClass.getSimpleName(), before, saved);
+        return saved;
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         requireWrite();
         T existing = repository.findById(id).orElseThrow(ApiException::notFound);
+        Object before = objectMapper.convertValue(existing, Map.class);
         repository.delete(existing);
+        auditService.recordChange("DELETE", entityClass.getSimpleName(), before, null);
         return ResponseEntity.noContent().build();
     }
 

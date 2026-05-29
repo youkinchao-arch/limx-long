@@ -15,3 +15,7 @@ lims:
   jwt:
     secret: test-secret-key-please-change-in-production-environment
     expire-minutes: 60
+  security:
+    login-rate-limit-per-minute: 0
+    max-failed-attempts: 5
+    lockout-minutes: 15

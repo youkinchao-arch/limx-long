@@ -36,6 +36,12 @@ lims:
     expire-minutes: ${ACCESS_TOKEN_EXPIRE_MINUTES:1440}
   cors:
     origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
+  security:
+    password-min-length: ${PASSWORD_MIN_LENGTH:8}
+    max-failed-attempts: ${MAX_FAILED_ATTEMPTS:5}
+    lockout-minutes: ${LOCKOUT_MINUTES:15}
+    login-rate-limit-per-minute: ${LOGIN_RATE_LIMIT_PER_MINUTE:60}
+    enforce-strong-secret: ${ENFORCE_STRONG_SECRET:false}
   admin:
     username: ${FIRST_ADMIN_USERNAME:admin}
     password: ${FIRST_ADMIN_PASSWORD:admin123}

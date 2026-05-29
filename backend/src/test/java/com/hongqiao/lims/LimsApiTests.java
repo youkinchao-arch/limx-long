@@ -165,4 +165,110 @@ class LimsApiTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items", notNullValue()));
     }
+
+    // ---- P1: audit trail + security hardening ----
+
+    private String loginToken(String username, String password) throws Exception {
+        MvcResult result = mockMvc
+                .perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("username", username)
+                        .param("password", password))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("access_token").asText();
+    }
+
+    private void createUser(String username, String password) throws Exception {
+        String body = "{\"username\":\"" + username + "\",\"full_name\":\"Sec " + username
+                + "\",\"password\":\"" + password + "\"}";
+        mockMvc.perform(post("/api/v1/auth/users")
+                        .header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void auditLogRecordsWriteOperations() throws Exception {
+        String token = bearer();
+        mockMvc.perform(post("/api/v1/documents")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"doc_no\":\"DOC-AUDIT\",\"title\":\"Audited\",\"status\":\"draft\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/audit/logs")
+                        .header("Authorization", token)
+                        .param("entity_type", "Document"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total", greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.items[0].action", is("CREATE")))
+                .andExpect(jsonPath("$.items[0].entity_type", is("Document")));
+    }
+
+    @Test
+    void weakPasswordRejectedOnUserCreate() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/users")
+                        .header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"weakpw_user\",\"full_name\":\"Weak\",\"password\":\"short\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", notNullValue()));
+    }
+
+    @Test
+    void changePasswordInvalidatesOldTokenAndRotatesCredentials() throws Exception {
+        createUser("pwchange_user", "Initial123");
+        String oldToken = "Bearer " + loginToken("pwchange_user", "Initial123");
+
+        MvcResult res = mockMvc
+                .perform(post("/api/v1/auth/change-password")
+                        .header("Authorization", oldToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"old_password\":\"Initial123\",\"new_password\":\"Updated456\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.access_token", notNullValue()))
+                .andReturn();
+        String newToken = "Bearer " + objectMapper.readTree(res.getResponse().getContentAsString())
+                .get("access_token").asText();
+
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", oldToken))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", newToken))
+                .andExpect(status().isOk());
+        loginToken("pwchange_user", "Updated456");
+    }
+
+    @Test
+    void logoutInvalidatesToken() throws Exception {
+        createUser("logout_user", "Logout123");
+        String token = "Bearer " + loginToken("logout_user", "Logout123");
+
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", token))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/auth/logout").header("Authorization", token))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void accountLocksAfterTooManyFailedAttempts() throws Exception {
+        createUser("lockout_user", "Lockout123");
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                            .param("username", "lockout_user")
+                            .param("password", "wrong-password"))
+                    .andExpect(status().isUnauthorized());
+        }
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("username", "lockout_user")
+                        .param("password", "Lockout123"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail", notNullValue()));
+    }
 }

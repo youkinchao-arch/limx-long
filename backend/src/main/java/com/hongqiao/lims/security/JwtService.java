@@ -1,6 +1,7 @@
 package com.hongqiao.lims.security;
 
 import com.hongqiao.lims.config.LimsProperties;
+import com.hongqiao.lims.user.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -35,10 +36,11 @@ public class JwtService {
         }
     }
 
-    public String generateToken(Long userId) {
+    public String generateToken(User user) {
         Instant now = Instant.now();
         return Jwts.builder()
-                .subject(String.valueOf(userId))
+                .subject(String.valueOf(user.getId()))
+                .claim("tv", user.getTokenVersion())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(expireMinutes, ChronoUnit.MINUTES)))
                 .id(UUID.randomUUID().toString())
@@ -46,12 +48,15 @@ public class JwtService {
                 .compact();
     }
 
-    public Long parseUserId(String token) {
-        Claims claims = Jwts.parser()
+    public Claims parse(String token) {
+        return Jwts.parser()
                 .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        return Long.valueOf(claims.getSubject());
+    }
+
+    public Long parseUserId(String token) {
+        return Long.valueOf(parse(token).getSubject());
     }
 }
