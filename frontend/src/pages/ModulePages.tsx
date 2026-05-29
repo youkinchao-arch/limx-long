@@ -51,31 +51,6 @@ export function MethodsPage() {
   );
 }
 
-export function ReportsPage() {
-  const { t } = useTranslation();
-  const fields: CrudField[] = [
-    { name: "report_no", label: t("report.reportNo"), required: true },
-    { name: "title", label: t("report.title"), required: true },
-    { name: "customer", label: t("report.customer") },
-    { name: "template", label: t("report.template") },
-    {
-      name: "status",
-      label: t("common.status"),
-      type: "select",
-      tag: { draft: "draft", submitted: "submitted", approved: "approved", archived: "archived" },
-      options: ["draft", "submitted", "approved", "archived"].map((s) => ({ value: s, label: s })),
-    },
-    { name: "issue_date", label: t("report.issueDate"), type: "date" },
-    { name: "remark", label: t("common.remark"), type: "textarea", hideInTable: true },
-  ];
-  return (
-    <div>
-      <Typography.Title level={4}>{t("menu.report")}</Typography.Title>
-      <CrudTable resource="/reports" permissionPrefix="report" fields={fields} />
-    </div>
-  );
-}
-
 export function ResourcesPage() {
   const { t } = useTranslation();
   const fields: CrudField[] = [

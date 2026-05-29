@@ -8,12 +8,8 @@ import PersonnelPage from "./pages/PersonnelPage";
 import EquipmentPage from "./pages/EquipmentPage";
 import { MaterialsPage, SuppliersPage } from "./pages/WarehousePages";
 import DocumentsPage from "./pages/DocumentsPage";
-import {
-  EnvironmentPage,
-  MethodsPage,
-  ReportsPage,
-  ResourcesPage,
-} from "./pages/ModulePages";
+import ReportsPage from "./pages/ReportsPage";
+import { EnvironmentPage, MethodsPage, ResourcesPage } from "./pages/ModulePages";
 import UsersPage from "./pages/UsersPage";
 import type { ReactNode } from "react";
 
