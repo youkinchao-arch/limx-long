@@ -38,10 +38,10 @@ interface CrudTableProps {
   permissionPrefix: string; // e.g. "document"
   fields: CrudField[];
   rowKey?: string;
-  extraRowActions?: (record: Row) => React.ReactNode;
+  extraRowActions?: (record: Row, refresh: () => void) => React.ReactNode;
 }
 
-interface Row {
+export interface Row {
   id: number;
   [k: string]: unknown;
 }
@@ -144,7 +144,7 @@ export default function CrudTable({
           if (value == null || value === "") return "-";
           if (f.tag) {
             const color =
-              { in_use: "green", active: "green", normal: "green", repair: "orange", warning: "orange", alarm: "red", scrapped: "red", sealed: "default" }[
+              { in_use: "green", active: "green", normal: "green", approved: "green", repair: "orange", warning: "orange", under_review: "orange", alarm: "red", rejected: "red", scrapped: "red", sealed: "default", obsolete: "default" }[
                 value as string
               ] || "blue";
             return <Tag color={color}>{f.tag[value as string] || String(value)}</Tag>;
@@ -159,7 +159,7 @@ export default function CrudTable({
       width: 220,
       render: (_: unknown, record: Row) => (
         <Space>
-          {extraRowActions?.(record)}
+          {extraRowActions?.(record, fetchData)}
           <Button
             size="small"
             icon={<EditOutlined />}

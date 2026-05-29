@@ -2,33 +2,6 @@ import { Typography } from "antd";
 import { useTranslation } from "react-i18next";
 import CrudTable, { type CrudField } from "../components/CrudTable";
 
-const docStatus = { draft: "draft", approved: "approved", published: "published", changed: "changed", obsolete: "obsolete" };
-
-export function DocumentsPage() {
-  const { t } = useTranslation();
-  const fields: CrudField[] = [
-    { name: "doc_no", label: t("document.docNo"), required: true },
-    { name: "title", label: t("document.title"), required: true },
-    { name: "category", label: t("document.category") },
-    { name: "version", label: t("document.version") },
-    {
-      name: "status",
-      label: t("common.status"),
-      type: "select",
-      tag: docStatus,
-      options: Object.keys(docStatus).map((s) => ({ value: s, label: s })),
-    },
-    { name: "effective_date", label: t("document.effectiveDate"), type: "date" },
-    { name: "remark", label: t("common.remark"), type: "textarea", hideInTable: true },
-  ];
-  return (
-    <div>
-      <Typography.Title level={4}>{t("menu.document")}</Typography.Title>
-      <CrudTable resource="/documents" permissionPrefix="document" fields={fields} />
-    </div>
-  );
-}
-
 export function EnvironmentPage() {
   const { t } = useTranslation();
   const fields: CrudField[] = [
