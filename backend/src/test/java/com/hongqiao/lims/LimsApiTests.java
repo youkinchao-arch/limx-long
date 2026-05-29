@@ -353,4 +353,117 @@ class LimsApiTests {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.detail", notNullValue()));
     }
+
+    // ---- P2: report approval + e-signature + issue workflow ----
+
+    private long createReport(String reportNo) throws Exception {
+        MvcResult created = mockMvc
+                .perform(post("/api/v1/reports")
+                        .header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"report_no\":\"" + reportNo + "\",\"title\":\"Test Report\",\"status\":\"draft\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+    }
+
+    @Test
+    void reportFullWorkflowHappyPath() throws Exception {
+        String token = bearer();
+        long id = createReport("RPT-WF-1");
+
+        mockMvc.perform(post("/api/v1/reports/" + id + "/submit")
+                        .header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("under_review")))
+                .andExpect(jsonPath("$.submitted_by_name", is("admin")));
+
+        mockMvc.perform(post("/api/v1/reports/" + id + "/approve")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"comment\":\"looks good\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("approved")))
+                .andExpect(jsonPath("$.approved_by_name", is("admin")));
+
+        mockMvc.perform(post("/api/v1/reports/" + id + "/sign")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"admin123\",\"meaning\":\"Reviewed and approved\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("signed")))
+                .andExpect(jsonPath("$.signed_by_name", is("admin")))
+                .andExpect(jsonPath("$.signature_hash", notNullValue()));
+
+        mockMvc.perform(post("/api/v1/reports/" + id + "/issue")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"issue_date\":\"2030-06-01\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("issued")))
+                .andExpect(jsonPath("$.issued_by_name", is("admin")))
+                .andExpect(jsonPath("$.issue_date", is("2030-06-01")));
+
+        mockMvc.perform(get("/api/v1/reports/" + id + "/signatures")
+                        .header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(4)))
+                .andExpect(jsonPath("$[0].action", is("ISSUE")))
+                .andExpect(jsonPath("$[3].action", is("SUBMIT")));
+    }
+
+    @Test
+    void reportSignRequiresCorrectPassword() throws Exception {
+        String token = bearer();
+        long id = createReport("RPT-WF-2");
+        mockMvc.perform(post("/api/v1/reports/" + id + "/submit").header("Authorization", token))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/reports/" + id + "/approve").header("Authorization", token))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/reports/" + id + "/sign")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"wrongpass\",\"meaning\":\"Test\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", notNullValue()));
+    }
+
+    @Test
+    void reportRejectAndResubmit() throws Exception {
+        String token = bearer();
+        long id = createReport("RPT-WF-3");
+        mockMvc.perform(post("/api/v1/reports/" + id + "/submit").header("Authorization", token))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/reports/" + id + "/reject")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"comment\":\"needs revision\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("rejected")));
+        mockMvc.perform(post("/api/v1/reports/" + id + "/submit").header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("under_review")));
+    }
+
+    @Test
+    void reportApproveRequiresApprovePermission() throws Exception {
+        long id = createReport("RPT-WF-4");
+        mockMvc.perform(post("/api/v1/reports/" + id + "/submit").header("Authorization", bearer()))
+                .andExpect(status().isOk());
+        createUser("rpt_no_approve", "NoApprove123");
+        String restricted = "Bearer " + loginToken("rpt_no_approve", "NoApprove123");
+        mockMvc.perform(post("/api/v1/reports/" + id + "/approve").header("Authorization", restricted))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void reportPdfDownload() throws Exception {
+        String token = bearer();
+        long id = createReport("RPT-PDF-1");
+        mockMvc.perform(get("/api/v1/reports/" + id + "/pdf")
+                        .header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF));
+    }
 }

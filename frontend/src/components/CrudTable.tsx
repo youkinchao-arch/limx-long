@@ -144,7 +144,7 @@ export default function CrudTable({
           if (value == null || value === "") return "-";
           if (f.tag) {
             const color =
-              { in_use: "green", active: "green", normal: "green", approved: "green", repair: "orange", warning: "orange", under_review: "orange", alarm: "red", rejected: "red", scrapped: "red", sealed: "default", obsolete: "default" }[
+              { in_use: "green", active: "green", normal: "green", approved: "green", signed: "cyan", issued: "green", submitted: "orange", repair: "orange", warning: "orange", under_review: "orange", alarm: "red", rejected: "red", scrapped: "red", sealed: "default", obsolete: "default" }[
                 value as string
               ] || "blue";
             return <Tag color={color}>{f.tag[value as string] || String(value)}</Tag>;
