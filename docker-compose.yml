@@ -18,7 +18,9 @@ services:
   backend:
     build: ./backend
     environment:
-      DATABASE_URL: postgresql+psycopg://lims:lims@db:5432/lims
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/lims
+      SPRING_DATASOURCE_USERNAME: lims
+      SPRING_DATASOURCE_PASSWORD: lims
       SECRET_KEY: change-me-in-production
       CORS_ORIGINS: http://localhost:3000,http://localhost:5173
     depends_on:
