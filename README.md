@@ -9,7 +9,7 @@ Laboratory Information Management System for the Hongqiao testing lab.
 ## 技术栈 / Tech Stack
 
 - **前端 Frontend**: React 18 + TypeScript + Vite + Ant Design 5, react-router, i18next（中英双语）
-- **后端 Backend**: FastAPI + SQLAlchemy 2.0 + PostgreSQL, JWT 认证, 基于角色的权限控制 (RBAC)
+- **后端 Backend**: Java 17 + Spring Boot 3.3 (Web / Security / Data JPA) + PostgreSQL, Flyway 数据库迁移, JWT 认证 (jjwt), 基于角色的权限控制 (RBAC), ZXing 设备二维码, springdoc-openapi (Swagger UI)
 - **部署 Deploy**: Docker Compose（Postgres + backend + nginx 前端）
 
 ## 功能模块 / Modules
@@ -35,15 +35,13 @@ Laboratory Information Management System for the Hongqiao testing lab.
 
 ```bash
 cd backend
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt
-# 默认连接 postgresql://lims:lims@localhost:5432/lims，可用 .env 覆盖
-cp .env.example .env
-uvicorn app.main:app --reload --port 8000
+# 默认连接 jdbc:postgresql://localhost:5432/lims（lims/lims），可用环境变量覆盖
+# 见 .env.example：SPRING_DATASOURCE_URL / SECRET_KEY / CORS_ORIGINS 等
+mvn spring-boot:run
 ```
 
-首次启动会自动建表并创建超级管理员 `admin / admin123`（可在 `.env` 中修改）。
-API 文档：http://localhost:8000/docs
+首次启动会自动运行 Flyway 迁移建表，并创建超级管理员 `admin / admin123`（可用环境变量修改）。
+API 文档 (Swagger UI)：http://localhost:8000/api/docs
 
 ### 前端 Frontend
 
@@ -63,8 +61,8 @@ docker compose up --build
 ## 测试与检查 / Tests & Checks
 
 ```bash
-# 后端
-cd backend && ruff check . && pytest -q
+# 后端（JUnit 5 + MockMvc + H2 内存库）
+cd backend && mvn verify
 # 前端
 cd frontend && npm run lint && npm run build
 ```
@@ -81,12 +79,17 @@ cd frontend && npm run lint && npm run build
 
 ```
 backend/
-  app/
-    core/      # 配置、数据库、安全、初始化
-    models/    # SQLAlchemy 模型
-    schemas/   # Pydantic 模型
-    api/       # 路由（auth / personnel / equipment / dashboard / modules）
-  tests/       # pytest
+  src/main/java/com/hongqiao/lims/
+    config/     # 安全、CORS、数据初始化、配置属性
+    security/   # JWT 过滤器、权限校验
+    common/     # 基础实体、分页、异常处理、通用 CRUD 基类
+    user/       # 用户/角色、认证控制器
+    personnel/  # 人员、部门、培训记录
+    equipment/  # 设备 + 二维码
+    modules/    # 仓库/文件/环境/方法/报告/资源 CRUD
+    dashboard/  # 运营看板汇总
+  src/main/resources/db/migration/  # Flyway 迁移 (V1__init.sql)
+  src/test/java/  # JUnit 5 + MockMvc 测试
 frontend/
   src/
     api/        # axios 客户端
