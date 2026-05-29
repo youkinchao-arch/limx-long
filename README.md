@@ -75,6 +75,19 @@ cd frontend && npm run lint && npm run build
 
 内置角色：`admin`（全部）、`manager`（读写全部模块）、`operator`（只读）。
 
+## 安全与审计 / Security & Audit (P1)
+
+- **审计追踪 Audit trail**：所有写操作（创建/更新/删除）及登录、登出、改密、登录失败均记录到 `audit_logs`（谁/何时/动作/实体/前后值/IP，仅追加不可改）。管理员可查询：`GET /api/v1/audit/logs?action=&entity_type=&q=&page=&page_size=`。
+- **令牌失效 Token invalidation**：登出 `POST /api/v1/auth/logout` 与改密 `POST /api/v1/auth/change-password` 会递增用户的 token 版本号，使此前签发的 JWT 立即失效。
+- **改密 Change password**：`POST /api/v1/auth/change-password`（`{old_password,new_password}`），校验旧密码 + 密码强度策略，返回新的 `access_token`。
+- **密码策略 Password policy**：默认至少 8 位且含字母与数字（`PASSWORD_MIN_LENGTH`），在创建用户 / 改密时校验。
+- **登录锁定 Lockout**：连续失败达 `MAX_FAILED_ATTEMPTS`（默认 5）后锁定 `LOCKOUT_MINUTES`（默认 15）分钟。
+- **登录限流 Rate limit**：按客户端 IP 每分钟 `LOGIN_RATE_LIMIT_PER_MINUTE`（默认 60，≤0 关闭）次。
+- **安全响应头 Security headers**：`X-Content-Type-Options`、`X-Frame-Options: DENY`、`Referrer-Policy`、`Content-Security-Policy`、HSTS。
+- **弱密钥拒启 Strong-secret guard**：生产环境设 `ENFORCE_STRONG_SECRET=true`，若 `SECRET_KEY` 仍是占位/过短则拒绝启动。
+
+以上接口均为**增量新增**，不改变既有 REST 契约，前端无需改动即可使用。
+
 ## 目录结构 / Layout
 
 ```
@@ -88,7 +101,8 @@ backend/
     equipment/  # 设备 + 二维码
     modules/    # 仓库/文件/环境/方法/报告/资源 CRUD
     dashboard/  # 运营看板汇总
-  src/main/resources/db/migration/  # Flyway 迁移 (V1__init.sql)
+    audit/      # 审计日志实体/服务/查询接口
+  src/main/resources/db/migration/  # Flyway 迁移 (V1__init.sql, V2__audit_and_security.sql)
   src/test/java/  # JUnit 5 + MockMvc 测试
 frontend/
   src/

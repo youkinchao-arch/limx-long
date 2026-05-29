@@ -7,6 +7,7 @@ import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hongqiao.lims.audit.AuditService;
 import com.hongqiao.lims.common.ApiException;
 import com.hongqiao.lims.common.BeanCopyUtils;
 import com.hongqiao.lims.common.PageResponse;
@@ -43,12 +44,17 @@ public class EquipmentController {
     private final EquipmentRepository repository;
     private final PermissionChecker perm;
     private final ObjectMapper objectMapper;
+    private final AuditService auditService;
 
     public EquipmentController(
-            EquipmentRepository repository, PermissionChecker perm, ObjectMapper objectMapper) {
+            EquipmentRepository repository,
+            PermissionChecker perm,
+            ObjectMapper objectMapper,
+            AuditService auditService) {
         this.repository = repository;
         this.perm = perm;
         this.objectMapper = objectMapper;
+        this.auditService = auditService;
     }
 
     private void requireRead() {
@@ -110,23 +116,30 @@ public class EquipmentController {
         if (repository.existsByAssetNo(body.getAssetNo())) {
             throw ApiException.badRequest("资产编号已存在 / Asset no exists");
         }
-        return ResponseEntity.status(HttpStatus.CREATED).body(repository.save(body));
+        Equipment saved = repository.save(body);
+        auditService.recordChange("CREATE", "Equipment", null, saved);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     @PutMapping("/{id}")
     public Equipment update(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         requireWrite();
         Equipment existing = repository.findById(id).orElseThrow(ApiException::notFound);
+        Object before = objectMapper.convertValue(existing, Map.class);
         Equipment incoming = objectMapper.convertValue(body, Equipment.class);
         BeanCopyUtils.copyNonNull(incoming, existing);
-        return repository.save(existing);
+        Equipment saved = repository.save(existing);
+        auditService.recordChange("UPDATE", "Equipment", before, saved);
+        return saved;
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         requireWrite();
         Equipment existing = repository.findById(id).orElseThrow(ApiException::notFound);
+        Object before = objectMapper.convertValue(existing, Map.class);
         repository.delete(existing);
+        auditService.recordChange("DELETE", "Equipment", before, null);
         return ResponseEntity.noContent().build();
     }
 

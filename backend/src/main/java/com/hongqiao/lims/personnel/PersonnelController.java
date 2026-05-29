@@ -1,6 +1,7 @@
 package com.hongqiao.lims.personnel;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hongqiao.lims.audit.AuditService;
 import com.hongqiao.lims.common.ApiException;
 import com.hongqiao.lims.common.BeanCopyUtils;
 import com.hongqiao.lims.common.PageResponse;
@@ -35,18 +36,21 @@ public class PersonnelController {
     private final TrainingRecordRepository trainingRepository;
     private final PermissionChecker perm;
     private final ObjectMapper objectMapper;
+    private final AuditService auditService;
 
     public PersonnelController(
             PersonnelRepository repository,
             DepartmentRepository departmentRepository,
             TrainingRecordRepository trainingRepository,
             PermissionChecker perm,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            AuditService auditService) {
         this.repository = repository;
         this.departmentRepository = departmentRepository;
         this.trainingRepository = trainingRepository;
         this.perm = perm;
         this.objectMapper = objectMapper;
+        this.auditService = auditService;
     }
 
     private void requireRead() {
@@ -152,23 +156,30 @@ public class PersonnelController {
         if (repository.existsByEmployeeNo(body.getEmployeeNo())) {
             throw ApiException.badRequest("工号已存在 / Employee no exists");
         }
-        return ResponseEntity.status(HttpStatus.CREATED).body(repository.save(body));
+        Personnel saved = repository.save(body);
+        auditService.recordChange("CREATE", "Personnel", null, saved);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     @PutMapping("/{id}")
     public Personnel update(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         requireWrite();
         Personnel existing = repository.findById(id).orElseThrow(ApiException::notFound);
+        Object before = objectMapper.convertValue(existing, Map.class);
         Personnel incoming = objectMapper.convertValue(body, Personnel.class);
         BeanCopyUtils.copyNonNull(incoming, existing);
-        return repository.save(existing);
+        Personnel saved = repository.save(existing);
+        auditService.recordChange("UPDATE", "Personnel", before, saved);
+        return saved;
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         requireWrite();
         Personnel existing = repository.findById(id).orElseThrow(ApiException::notFound);
+        Object before = objectMapper.convertValue(existing, Map.class);
         repository.delete(existing);
+        auditService.recordChange("DELETE", "Personnel", before, null);
         return ResponseEntity.noContent().build();
     }
 }

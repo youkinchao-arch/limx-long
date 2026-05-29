@@ -35,9 +35,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
             String token = header.substring(7);
             try {
-                Long userId = jwtService.parseUserId(token);
+                io.jsonwebtoken.Claims claims = jwtService.parse(token);
+                Long userId = Long.valueOf(claims.getSubject());
+                Integer tokenVersion = claims.get("tv", Integer.class);
                 User user = userRepository.findById(userId).orElse(null);
-                if (user != null && user.isActive()) {
+                if (user != null && user.isActive()
+                        && tokenVersion != null && tokenVersion == user.getTokenVersion()) {
                     List<SimpleGrantedAuthority> authorities = user.effectivePermissions().stream()
                             .map(SimpleGrantedAuthority::new)
                             .toList();

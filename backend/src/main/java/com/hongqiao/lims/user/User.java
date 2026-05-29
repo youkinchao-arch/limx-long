@@ -40,6 +40,19 @@ public class User extends BaseEntity {
     @Column(name = "is_superuser", nullable = false)
     private boolean superuser = false;
 
+    /** Incremented on logout / password change to invalidate previously issued tokens. */
+    @JsonIgnore
+    @Column(name = "token_version", nullable = false)
+    private int tokenVersion = 0;
+
+    @JsonIgnore
+    @Column(name = "failed_login_attempts", nullable = false)
+    private int failedLoginAttempts = 0;
+
+    @JsonIgnore
+    @Column(name = "locked_until")
+    private java.time.Instant lockedUntil;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",

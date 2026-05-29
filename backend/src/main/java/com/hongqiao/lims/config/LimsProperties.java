@@ -15,6 +15,22 @@ public class LimsProperties {
     private final Jwt jwt = new Jwt();
     private final Cors cors = new Cors();
     private final Admin admin = new Admin();
+    private final Security security = new Security();
+
+    @Getter
+    @Setter
+    public static class Security {
+        /** Minimum password length enforced on create / change-password. */
+        private int passwordMinLength = 8;
+        /** Failed login attempts before the account is temporarily locked. */
+        private int maxFailedAttempts = 5;
+        /** How long an account stays locked after exceeding the failed-attempt threshold. */
+        private int lockoutMinutes = 15;
+        /** Max login attempts per client IP within one minute (<= 0 disables rate limiting). */
+        private int loginRateLimitPerMinute = 60;
+        /** Abort startup if the JWT secret still looks like a placeholder (enable in prod). */
+        private boolean enforceStrongSecret = false;
+    }
 
     @Getter
     @Setter
